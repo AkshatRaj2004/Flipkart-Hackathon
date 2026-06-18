@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgis/postgis:15-3.4-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-trafficwise}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trafficwise}
+      POSTGRES_DB: ${POSTGRES_DB:-trafficwise}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trafficwise} -d ${POSTGRES_DB:-trafficwise}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-trafficwise}:${POSTGRES_PASSWORD:-trafficwise}@db:5432/${POSTGRES_DB:-trafficwise}
+      CSV_PATH: /data/events.csv
+    volumes:
+      - ../Astram event data_anonymized - Astram event data_anonymizedb40ac87.csv:/data/events.csv:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "${APP_PORT:-80}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
